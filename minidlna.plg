@@ -320,11 +320,42 @@ minidlna_change_settings()
   PORT=$1
   NETWORK_INTERFACE=$2
   USER=$3
-  MEDIA_DIR1=$4
-  MEDIA_DIR2=$5
-  MEDIA_DIR3=$6
-  MEDIA_DIR4=$7
-  MEDIA_DIR5=$8
+
+  if [ "$4" = "" ]; then
+    MEDIA_DIR1=nodir
+  else
+    MEDIA_DIR1=$4
+  fi
+
+    if [ "$5" = "" ]; then
+    MEDIA_DIR2=nodir
+  else
+    MEDIA_DIR2=$5
+  fi
+
+    if [ "$6" = "" ]; then
+    MEDIA_DIR3=nodir
+  else
+    MEDIA_DIR3=$6
+  fi
+
+    if [ "$7" = "" ]; then
+    MEDIA_DIR4=nodir
+  else
+    MEDIA_DIR4=$7
+  fi
+
+    if [ "$8" = "" ]; then
+    MEDIA_DIR5=nodir
+  else
+    MEDIA_DIR5=$8
+  fi
+
+  #MEDIA_DIR2=$5
+  #MEDIA_DIR3=$6
+  #MEDIA_DIR4=$7
+  #MEDIA_DIR5=$8
+  
   FRIENDLY_NAME=$9
   DB_DIR=${10}
   LOG_DIR=${11}
@@ -729,37 +760,67 @@ $updates_exist = "false";
 
       <tr>
       <td><a class="tooltip" href="#">Media Directory 1:<span class="classic">Set this to the directory you want to be scanned</span></a></td>
-      <td>
-      <input type="text" name="MEDIA_DIR1" value="<?=$minidlna_cfg['MEDIA_DIR1'];?>" title="This can be any valid unRAID directory path">
-      </td>
+      <?if ($minidlna_cfg['MEDIA_DIR1'] == "nodir"):?>
+        <td>
+        <input type="text" name="MEDIA_DIR1" title="This can be any valid unRAID directory path">
+        </td>      
+      <?else:?>
+        <td>
+        <input type="text" name="MEDIA_DIR1" value="<?=$minidlna_cfg['MEDIA_DIR1'];?>" title="This can be any valid unRAID directory path">
+        </td>
+      <?endif;?>
       </tr> 
 
       <tr>
       <td><a class="tooltip" href="#">Media Directory 2:<span class="classic">Set this to the directory you want to be scanned</span></a></td>
-      <td>
-      <input type="text" name="MEDIA_DIR2" value="<?=$minidlna_cfg['MEDIA_DIR2'];?>" title="This can be any valid unRAID directory path">
-      </td>
+      <?if ($minidlna_cfg['MEDIA_DIR2'] == "nodir"):?>
+        <td>
+        <input type="text" name="MEDIA_DIR2" title="This can be any valid unRAID directory path">
+        </td>      
+      <?else:?>
+        <td>
+        <input type="text" name="MEDIA_DIR2" value="<?=$minidlna_cfg['MEDIA_DIR2'];?>" title="This can be any valid unRAID directory path">
+        </td>
+      <?endif;?>
       </tr> 
       
       <tr>
       <td><a class="tooltip" href="#">Media Directory 3:<span class="classic">Set this to the directory you want to be scanned</span></a></td>
-      <td>
-      <input type="text" name="MEDIA_DIR3" value="<?=$minidlna_cfg['MEDIA_DIR3'];?>" title="This can be any valid unRAID directory path">
-      </td>
+      <?if ($minidlna_cfg['MEDIA_DIR3'] == "nodir"):?>
+        <td>
+        <input type="text" name="MEDIA_DIR3" title="This can be any valid unRAID directory path">
+        </td>      
+      <?else:?>
+        <td>
+        <input type="text" name="MEDIA_DIR3" value="<?=$minidlna_cfg['MEDIA_DIR3'];?>" title="This can be any valid unRAID directory path">
+        </td>
+      <?endif;?>
       </tr> 
 
       <tr>
       <td><a class="tooltip" href="#">Media Directory 4:<span class="classic">Set this to the directory you want to be scanned</span></a></td>
-      <td>
-      <input type="text" name="MEDIA_DIR4" value="<?=$minidlna_cfg['MEDIA_DIR4'];?>" title="This can be any valid unRAID directory path">
-      </td>
+      <?if ($minidlna_cfg['MEDIA_DIR4'] == "nodir"):?>
+        <td>
+        <input type="text" name="MEDIA_DIR4" title="This can be any valid unRAID directory path">
+        </td>      
+      <?else:?>
+        <td>
+        <input type="text" name="MEDIA_DIR4" value="<?=$minidlna_cfg['MEDIA_DIR4'];?>" title="This can be any valid unRAID directory path">
+        </td>
+      <?endif;?>
       </tr> 
 
       <tr>
       <td><a class="tooltip" href="#">Media Directory 5:<span class="classic">Set this to the directory you want to be scanned</span></a></td>
-      <td>
-      <input type="text" name="MEDIA_DIR5" value="<?=$minidlna_cfg['MEDIA_DIR5'];?>" title="This can be any valid unRAID directory path">
-      </td>
+      <?if ($minidlna_cfg['MEDIA_DIR5'] == "nodir"):?>
+        <td>
+        <input type="text" name="MEDIA_DIR5" title="This can be any valid unRAID directory path">
+        </td>      
+      <?else:?>
+        <td>
+        <input type="text" name="MEDIA_DIR5" value="<?=$minidlna_cfg['MEDIA_DIR5'];?>" title="This can be any valid unRAID directory path">
+        </td>
+      <?endif;?>
       </tr> 
 
       <tr>
@@ -933,6 +994,10 @@ checkRUNNING(document.minidlna_settings);
 </INLINE>
 </FILE>
 
+# Have to put tests in here for empty fields on form submit. If we don't then cfg file
+# gets hopelessly corrupted. When a field that must be populated is submitted with no
+# contents, then we simply revert to the default (and sensible) value.
+
 <FILE Name="/usr/local/emhttp/plugins/minidlna/minidlnactl.php" Mode="0770">
 <INLINE>
 <![CDATA[
@@ -976,26 +1041,137 @@ checkRUNNING(document.minidlna_settings);
   parse_str($argv[1],$_POST);
 
   $SERVICE=$_POST['SERVICE'];
-  $PORT=$_POST['PORT'];
-  $NETWORK_INTERFACE=$_POST['NETWORK_INTERFACE'];
-  $USER=$_POST['USER'];
-  $MEDIA_DIR1=$_POST['MEDIA_DIR1'];
-  $MEDIA_DIR2=$_POST['MEDIA_DIR2'];
-  $MEDIA_DIR3=$_POST['MEDIA_DIR3'];
-  $MEDIA_DIR4=$_POST['MEDIA_DIR4'];
-  $MEDIA_DIR5=$_POST['MEDIA_DIR5'];
-  $FRIENDLY_NAME=$_POST['FRIENDLY_NAME'];
-  $DB_DIR=$_POST['DB_DIR'];
-  $LOG_DIR=$_POST['LOG_DIR'];
-  $LOG_LEVEL=$_POST['LOG_LEVEL'];
-  $ALBUM_ART_NAMES=$_POST['ALBUM_ART_NAMES'];
+
+  if (empty($_POST['PORT'])) {
+    $PORT=8200;
+  }
+  else {
+    $PORT=$_POST['PORT'];
+  }
+
+  if (empty($_POST['NETWORK_INTERFACE'])) {
+    $NETWORK_INTERFACE=eth0;
+  }
+  else {
+    $NETWORK_INTERFACE=$_POST['NETWORK_INTERFACE'];
+  }
+  
+  if (empty($_POST[''])) {
+    $=eth0;
+  }
+  else {
+    $=$_POST[''];
+  }
+  
+  if (empty($_POST['USER'])) {
+    $USER=nobody;
+  }
+  else {
+    $USER=$_POST['USER'];
+  }
+  
+  if (empty($_POST['MEDIA_DIR1'])) {
+    $MEDIA_DIR1=/opt;
+  } 
+  else {
+    $MEDIA_DIR1=$_POST['MEDIA_DIR1'];
+  }
+
+  if (empty($_POST['MEDIA_DIR2'])) {
+    $MEDIA_DIR2=nodir;
+  } 
+  else {
+    $MEDIA_DIR2=$_POST['MEDIA_DIR2'];
+  }
+  
+  if (empty($_POST['MEDIA_DIR3'])) {
+    $MEDIA_DIR3=nodir;
+  } 
+  else {
+    $MEDIA_DIR3=$_POST['MEDIA_DIR3'];
+  }
+
+  if (empty($_POST['MEDIA_DIR4'])) {
+    $MEDIA_DIR4=nodir;
+  } 
+  else {
+    $MEDIA_DIR4=$_POST['MEDIA_DIR4'];
+  }
+
+  if (empty($_POST['MEDIA_DIR5'])) {
+    $MEDIA_DIR5=nodir;
+  } 
+  else {
+    $MEDIA_DIR5=$_POST['MEDIA_DIR5'];
+  }
+
+  if (empty($_POST['FRIENDLY_NAME'])) {
+    $FRIENDLY_NAME=unRAID;
+  }
+  else {
+    $FRIENDLY_NAME=$_POST['FRIENDLY_NAME'];
+  }
+  
+  if (empty($_POST['DB_DIR'])) {
+    $DB_DIR=/boot/config/plugins/minidlna;
+  }
+  else {
+    $DB_DIR=$_POST['DB_DIR'];
+  }
+
+  if (empty($_POST['LOG_DIR'])) {
+    $LOG_DIR=/boot/config/plugins/minidlna;
+  }
+  else {
+    $LOG_DIR=$_POST['LOG_DIR'];
+  }
+
+  if (empty($_POST['LOG_LEVEL'])) {
+    $LOG_LEVEL="general,artwork,database,inotify,scanner,metadata,http,ssdp,tivo=warn";
+  }
+  else {
+    $LOG_LEVEL=$_POST['LOG_LEVEL'];
+  }
+  
+  if (empty($_POST['ALBUM_ART_NAMES'])) {
+    $ALBUM_ART_NAMES=Cover.jpg/cover.jpg/AlbumArtSmall.jpg/albumartsmall.jpg/AlbumArt.jpg/albumart.jpg/Album.jpg/album.jpg/Folder.jpg/folder.jpg/Thumb.jpg/thumb.jpg;
+  }
+  else {
+    $ALBUM_ART_NAMES=$_POST['ALBUM_ART_NAMES'];
+  }
+  
   $INOTIFY=$_POST['INOTIFY'];
   $ENABLE_TIVO=$_POST['ENABLE_TIVO'];
   $STRICT_DLNA=$_POST['STRICT_DLNA'];
-  $NOTIFY_INTERVAL=$_POST['NOTIFY_INTERVAL'];
-  $SERIAL=$_POST['SERIAL'];
-  $MODEL_NUMBER=$_POST['MODEL_NUMBER'];
-  $ROOT_CONTAINER=$_POST['ROOT_CONTAINER'];
+
+  if (empty($_POST['NOTIFY_INTERVAL'])) {
+    $NOTIFY_INTERVAL=900;
+  }
+  else {
+    $NOTIFY_INTERVAL=$_POST['NOTIFY_INTERVAL'];
+  }
+
+  if (empty($_POST['SERIAL'])) {
+    $SERIAL=12345678;
+  }
+  else {
+    $SERIAL=$_POST['SERIAL'];
+  }
+
+  if (empty($_POST['MODEL_NUMBER'])) {
+    $MODEL_NUMBER=1;
+  }
+  else {
+    $MODEL_NUMBER=$_POST['MODEL_NUMBER'];
+  }
+
+  if (empty($_POST['ROOT_CONTAINER'])) {
+    $ROOT_CONTAINER=.;
+  }
+  else {
+    $ROOT_CONTAINER=$_POST['ROOT_CONTAINER'];
+  }
+  
 
   switch ($_POST['cmd']) {
     case 'apply':
