@@ -40,12 +40,10 @@ Plugin file locations:
  /usr/local/emhttp/plugins/minidlna/minidlna.page                       # page file for webGui menu system
  /usr/local/emhttp/plugins/minidlna/minidlna.php                        # webGui page code
 
- /var/log/plugins/minidlna                                              # created upon install success. can be overridden by log_dir directive.
+ /var/log/plugins/minidlna                                              # created upon install success.
  /var/run/minidlna/minidlna.pid                                         # run-time pid file
 
- /usr/bin/minidlna.py                                                   # minidlna python application
- /usr/local/minidlna                                                    # minidlna configuration directory
- /usr/local/minidlna/data                                               # minidlna work directory (default. should be relocated to non-volatile storage via webgui)
+ /usr/local/minidlna                                                    # minidlna binary and default log directory
  
 -->
 
@@ -126,8 +124,8 @@ MEDIA_DIR3=nodir
 MEDIA_DIR4=nodir
 MEDIA_DIR5=nodir
 FRIENDLY_NAME=unRAID
-DB_DIR=/var/cache/minidlna
-LOG_DIR=/var/log/plugins/minidlna
+DB_DIR=/boot/config/plugins/minidlna
+LOG_DIR=/boot/config/plugins/minidlna
 LOG_LEVEL="general,artwork,database,inotify,scanner,metadata,http,ssdp,tivo=warn"
 ALBUM_ART_NAMES=Cover.jpg/cover.jpg/AlbumArtSmall.jpg/albumartsmall.jpg/AlbumArt.jpg/albumart.jpg/Album.jpg/album.jpg/Folder.jpg/folder.jpg/Thumb.jpg/thumb.jpg
 INOTIFY=yes
@@ -157,7 +155,7 @@ minidlna_start()
   if [ -f /var/run/minidlna/minidlna.pid ]; then
     return
   fi   
-  CMDLINE="/usr/local/minidlna/minidlnad -f /boot/config/plugins/minidlna/minidlna.conf -P /var/run/minidlna/minidlna.pid > /dev/null 2>&1"
+  CMDLINE="/usr/local/minidlna/minidlnad -f /boot/config/plugins/minidlna/minidlna.conf -P /var/run/minidlna/minidlna.pid"
   $CMDLINE
 }
 
@@ -244,7 +242,7 @@ write_plugin_config()
 write_minidlna_conf_file()
 {
   echo "# minidlna server daemon configuration file" >> /boot/config/plugins/minidlna/minidlna.conf
-  echo "port for HTTP (descriptions, SOAP, media transfer) traffic" >> /boot/config/plugins/minidlna/minidlna.conf
+  echo "# port for HTTP (descriptions, SOAP, media transfer) traffic" >> /boot/config/plugins/minidlna/minidlna.conf
   echo "port=$PORT" >> /boot/config/plugins/minidlna/minidlna.conf
   echo "# network interface to bind to (this is the only interface that will serve files)" >> /boot/config/plugins/minidlna/minidlna.conf
   echo "network_interface=$NETWORK_INTERFACE" >> /boot/config/plugins/minidlna/minidlna.conf
@@ -364,7 +362,6 @@ minidlna_enable()
   minidlna_change_settings $2 $3 $4 $5 $6 $7 $8 $9 ${10} ${11} ${12} ${13} ${14} ${15} ${16} ${17} ${18} ${19} ${20} ${21}
   write_plugin_config
   write_minidlna_conf_file
-  minidlna_install
   minidlna_restart
 }
 
@@ -724,7 +721,7 @@ $updates_exist = "false";
       </tr> 
 
       <tr>
-      <td><a class="tooltip" href="#">User to run as:<span class="classic">The unRAID user that the service will run under</span></a></td>
+      <td><a class="tooltip" href="#">User to run as:<span class="classic">The unRAID user that the service will run under. If you run as 'nobody', ensure that both log directory and database directory are writeable for this user.</span></a></td>
       <td>
       <input type="text" name="USER" value="<?=$minidlna_cfg['USER'];?>" title="Default is nobody, but can be set to any valid unRAID user">
       </td>
