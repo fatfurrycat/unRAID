@@ -1056,13 +1056,6 @@ checkRUNNING(document.minidlna_settings);
     $NETWORK_INTERFACE=$_POST['NETWORK_INTERFACE'];
   }
   
-  if (empty($_POST[''])) {
-    $=eth0;
-  }
-  else {
-    $=$_POST[''];
-  }
-  
   if (empty($_POST['USER'])) {
     $USER=nobody;
   }
