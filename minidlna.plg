@@ -467,7 +467,6 @@ minidlna_datacheck()
 
 # read our configuration
 source /boot/config/plugins/minidlna/minidlna.cfg
-source /boot/config/plugins/minidlna/minidlna.conf
 
 case "$1" in
   'start')
@@ -577,7 +576,7 @@ $updates_exist = "false";
   <div style="border: 0px solid black;">
     <span class="left">
       <p>
-        <span class="green-text"><b><?=$minidlna_localapp?></b></span>
+        <span class="green-text"><b>MiniDLNA version: <?=$minidlna_localapp?></b></span>
           <? if ($minidlna_running=="yes"): ?>
             <?=$minidlna_datacheck?> 
           <?endif;?> 
