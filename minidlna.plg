@@ -126,8 +126,8 @@ MEDIA_DIR5=
 FRIENDLY_NAME=unRAID
 DB_DIR=/var/cache/minidlna
 LOG_DIR=/var/log/plugins/minidlna
-LOG_LEVEL=general,artwork,database,inotify,scanner,metadata,http,ssdp,tivo=warn
-ALBUM_ART_NAMES="Cover.jpg/cover.jpg/AlbumArtSmall.jpg/albumartsmall.jpg/AlbumArt.jpg/albumart.jpg/Album.jpg/album.jpg/Folder.jpg/folder.jpg/Thumb.jpg/thumb.jpg"
+LOG_LEVEL="general,artwork,database,inotify,scanner,metadata,http,ssdp,tivo=warn"
+ALBUM_ART_NAMES=Cover.jpg/cover.jpg/AlbumArtSmall.jpg/albumartsmall.jpg/AlbumArt.jpg/albumart.jpg/Album.jpg/album.jpg/Folder.jpg/folder.jpg/Thumb.jpg/thumb.jpg
 INOTIFY=yes
 ENABLE_TIVO=no
 STRICT_DLNA=no
@@ -225,8 +225,8 @@ write_plugin_config()
   echo "FRIENDLY_NAME=$FRIENDLY_NAME" >> /boot/config/plugins/minidlna/minidlna.cfg
   echo "DB_DIR=$DB_DIR" >> /boot/config/plugins/minidlna/minidlna.cfg
   echo "LOG_DIR=$LOG_DIR" >> /boot/config/plugins/minidlna/minidlna.cfg
-  echo "LOG_LEVEL=$LOG_LEVEL" >> /boot/config/plugins/minidlna/minidlna.cfg
-  echo "ALBUM_ART_NAMES=\"$ALBUM_ART_NAMES\"" >> /boot/config/plugins/minidlna/minidlna.cfg
+  echo "LOG_LEVEL=\"$LOG_LEVEL\"" >> /boot/config/plugins/minidlna/minidlna.cfg
+  echo "ALBUM_ART_NAMES=$ALBUM_ART_NAMES" >> /boot/config/plugins/minidlna/minidlna.cfg
   echo "INOTIFY=$INOTIFY" >> /boot/config/plugins/minidlna/minidlna.cfg
   echo "ENABLE_TIVO=$ENABLE_TIVO" >> /boot/config/plugins/minidlna/minidlna.cfg
   echo "STRICT_DLNA=$STRICT_DLNA" >> /boot/config/plugins/minidlna/minidlna.cfg
