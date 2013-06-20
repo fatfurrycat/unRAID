@@ -1,0 +1,1206 @@
+<?xml version='1.0' standalone='yes'?>
+
+<!DOCTYPE PLUGIN [
+<!ENTITY plugin "MiniDLNA">
+<!ENTITY author "Bagpuss">
+<!ENTITY plgver "1.0">
+<!ENTITY pkg "/boot/packages">
+<!ENTITY plg "/boot/config/plugins/minidlna">
+<!ENTITY img "/boot/config/plugins/images">
+<!ENTITY gui "/usr/local/emhttp/plugins">
+<!ENTITY ram "/usr/local/minidlna">
+<!ENTITY url1 "https://raw.github.com/overbyrn/UnRAID/master">
+<!ENTITY url2 "https://dl.dropbox.com/u/3094307/unRAID">
+<!ENTITY dev "true"><!-- set to "true" during plugin development -->
+]>
+
+<PLUGIN>
+<!--
+Copyright (c) 2013, Andy Fox (Bagpuss)
+Many, many thanks to Rich Manton (overbyrn) for his DenyHosts plugin, on which this is extensively based.
+
+The plugin installs minidlna, a lightweight DLNA server especially suited to Samsung devices.
+
+Plugin file locations:
+ /boot/plugins/minidlna.plg                                             # this file
+ 
+ /tmp/plugin-prepare                                                    # network readiness script
+ /tmp/plugin-cleanup                                                    # deletion script
+ /tmp/plugin-install                                                    # installation script
+
+ /boot/config/plugins/minidlna/minidlna_1.1.0_static.tar.gz             # minidlna binaries and configuration file
+ 
+ /boot/config/plugins/minidlna/minidlna.png                             # icon file (copied to webgui plugin dir)
+ /boot/config/plugins/images/device_status.png                          # icon file (copied to webgui plugin dir)
+ /boot/config/plugins/images/new_config.png                             # icon file (copied to webgui plugin dir)
+ /boot/config/plugins/images/information.png                            # icon file (copied to webgui plugin dir)
+ /boot/config/plugins/minidlna/minidlna.cfg                             # non-volatile configuration for plugin
+ /boot/config/plugins/minidlna/minidlna.conf                            # non-volatile configuration for minidlna
+ /etc/rc.d/rc.minidlna                                                  # plugin control script
+ /usr/local/emhttp/plugins/minidlna/minidlna.page                       # page file for webGui menu system
+ /usr/local/emhttp/plugins/minidlna/minidlna.php                        # webGui page code
+
+ /var/log/plugins/minidlna                                              # created upon install success. can be overridden by log_dir directive.
+ /var/run/minidlna/minidlna.pid                                         # run-time pid file
+
+ /usr/bin/minidlna.py                                                   # minidlna python application
+ /usr/local/minidlna                                                    # minidlna configuration directory
+ /usr/local/minidlna/data                                               # minidlna work directory (default. should be relocated to non-volatile storage via webgui)
+ 
+-->
+
+<FILE Name="/tmp/plugin-prepare" Run="/bin/bash">
+<INLINE>
+# Wait until network is ready
+timer=30
+while [ $timer -gt 0 ]; do
+  gateway=$(route -n | awk '/^0.0.0.0/ {print $2}')
+  if [ -n "$gateway" ] &amp;&amp; [ $(ping -q -n -c 1 $gateway | awk -F, '/received/ {print $2}' | awk '{print $1}') -eq 1 ]; then
+    break
+  fi
+  timer=$((timer-1))
+  sleep 1
+done
+if [ $timer -eq 0 ]; then
+  echo "No network communication !!!"
+fi
+# Remove this script
+rm -f /tmp/plugin-prepare
+</INLINE>
+</FILE>
+
+<FILE Name="&plg;/minidlna.png">
+<URL>-q --no-check-certificate &url2;/plugin.images/minidlna.png</URL>
+</FILE>
+
+<FILE Name="&img;/device_status.png">
+<URL>-q --no-check-certificate &url2;/plugin.images/device_status.png</URL>
+</FILE>
+
+<FILE Name="&img;/new_config.png">
+<URL>-q --no-check-certificate &url2;/plugin.images/new_config.png</URL>
+</FILE>
+
+<FILE Name="&img;/information.png">
+<URL>-q --no-check-certificate &url2;/plugin.images/information.png</URL>
+</FILE>
+
+<FILE Name="&plg;/minidlna_1.1.0_static.tar.gz">
+<URL>-q --no-check-certificate &url2;/packages.custom/minidlna_1.1.0_static.tar.gz</URL>
+</FILE>
+
+<FILE Name="/tmp/plugin-cleanup" Run="/bin/bash">
+<INLINE>
+# delete file but don't warn if file does not exist
+rmNoWarn() {
+  test -e $1 &amp;&amp; rm $1 2>/dev/null
+}
+
+# delete directory but don't warn if directory does not exist
+rmRecursiveNoWarn() {
+  test -e $1 &amp;&amp; rm -r $1 2>/dev/null
+}
+
+#Remove currently installed plugin files
+rmNoWarn /etc/rc.d/rc.minidlna                            # control script
+rmNoWarn /var/run/minidlna/minidlna.pid                   # stale pid file
+rmRecursiveNoWarn /usr/local/emhttp/plugins/minidlna      # unraid webgui integration files
+rmNoWarn /var/log/plugins/minidlna                        # record of previous plugin installation
+
+rm /tmp/plugin-cleanup
+</INLINE>
+</FILE>
+
+<FILE Name="/boot/config/plugins/minidlna/minidlna.cfg">
+<INLINE>
+# minidlna plugin configuration
+SERVICE=disable
+PORT=8200
+NETWORK_INTERFACE=eth0
+USER=nobody
+MEDIA_DIR1=/opt
+MEDIA_DIR2=
+MEDIA_DIR3=
+MEDIA_DIR4=
+MEDIA_DIR5=
+FRIENDLY_NAME=unRAID
+DB_DIR=/var/cache/minidlna
+LOG_DIR=/var/log/plugins/minidlna
+LOG_LEVEL=general,artwork,database,inotify,scanner,metadata,http,ssdp,tivo=warn
+ALBUM_ART_NAMES=Cover.jpg/cover.jpg/AlbumArtSmall.jpg/albumartsmall.jpg/AlbumArt.jpg/albumart.jpg/Album.jpg/album.jpg/Folder.jpg/folder.jpg/Thumb.jpg/thumb.jpg
+INOTIFY=yes
+ENABLE_TIVO=no
+STRICT_DLNA=no
+NOTIFY_INTERVAL=900
+SERIAL=12345678
+MODEL_NUMBER=1
+ROOT_CONTAINER=.
+</INLINE>
+</FILE>
+
+<FILE Name="/etc/rc.d/rc.minidlna" Mode="0770">
+<INLINE>
+<![CDATA[
+#!/bin/bash
+# start|stop|restart|enable|disable|buttonstart|rescan|updateplg|getver|datacheck minidlna.
+
+minidlna_start()
+{
+  # no-op if not enabled
+  if [ $SERVICE != "enable" ]; then
+    return
+  fi
+
+  # no-op if already running
+  if [ -f /var/run/minidlna/minidlna.pid ]; then
+    return
+  fi   
+  CMDLINE="/usr/local/minidlna/minidlnad -f /boot/config/plugins/minidlna/minidlna.conf -P /var/run/minidlna/minidlna.pid > /dev/null 2>&1"
+  $CMDLINE
+}
+
+minidlna_stop()
+{   
+  # no-op if already stopped
+  if [ ! -f /var/run/minidlna/minidlna.pid ]; then
+    return
+  fi 
+
+  # minidlna expects SIGTERM
+  # we need sleep 5 in here, as it takes a little time for minidlna to close down it's media database
+  # if we don't wait, then a quick restart will fail
+  kill $(cat /var/run/minidlna/minidlna.pid)
+  sleep 5
+
+  #Expect the unexpected
+  PID=$(ps -ef | grep minidlnad | grep -v grep | awk '{print $2}');
+  test "$PID" != "" && kill -9 $PID
+  [[ -f /var/run/minidlna/minidlna.pid ]] && rm -f /var/run/minidlna/minidlna.pid
+}
+
+minidlna_restart()
+{
+  # we have another sleep 5 in here, as I've seen a restart fail, even with the sleep 5 in the stop function
+  minidlna_stop
+  sleep 5
+  minidlna_start
+}
+
+minidlna_buttonstart()
+{
+  # Have separated config files into PLUGIN_CONFIG and MINIDLNA_CONFIG.
+  # This avoids having SERVICE and WORK_DIR directives in the minidlna config file.
+  # If these were in the file, then minidlna throws a configuration file parsing error.
+  PLUGIN_CONFIG="/boot/config/plugins/minidlna/minidlna.cfg"
+  if [ -f $PLUGIN_CONFIG ]; then
+    # a less greedy sed.  only replaces the first occurance of disabled with enabled.  ie. will only hit service line which is (usually) always first in cfg
+	sed -i "0,/"disable"/s/"disable"/"enable/"" $PLUGIN_CONFIG 2>/dev/null  
+	SERVICE=enable
+    minidlna_start
+  fi
+}
+
+minidlna_rescan()
+{
+  # This forces minidlna to rebuild it's media library.
+  # This can be necessary if you've added files to the library directories when minidlna was not running.
+  # Doing so prevents inotify from being used to recognise that new files are available.
+  minidlna_stop
+  CMDLINE="/usr/local/minidlna/minidlnad -f /boot/config/plugins/minidlna/minidlna.conf -P /var/run/minidlna/minidlna.pid -R > /dev/null 2>&1"
+  $CMDLINE 
+}
+
+write_plugin_config()
+{
+  echo "# minidlna plugin configuration file" >> /boot/config/plugins/minidlna/minidlna.cfg
+  echo "SERVICE=$SERVICE" >> /boot/config/plugins/minidlna/minidlna.cfg
+  echo "PORT=$PORT" >> /boot/config/plugins/minidlna/minidlna.cfg
+  echo "NETWORK_INTERFACE=$NETWORK_INTERFACE" >> /boot/config/plugins/minidlna/minidlna.cfg
+  echo "USER=$USER" >> /boot/config/plugins/minidlna/minidlna.cfg
+  echo "MEDIA_DIR1=$MEDIA_DIR1" >> /boot/config/plugins/minidlna/minidlna.cfg
+  echo "MEDIA_DIR2=$MEDIA_DIR2" >> /boot/config/plugins/minidlna/minidlna.cfg
+  echo "MEDIA_DIR3=$MEDIA_DIR3" >> /boot/config/plugins/minidlna/minidlna.cfg
+  echo "MEDIA_DIR4=$MEDIA_DIR4" >> /boot/config/plugins/minidlna/minidlna.cfg
+  echo "MEDIA_DIR5=$MEDIA_DIR5" >> /boot/config/plugins/minidlna/minidlna.cfg
+  echo "FRIENDLY_NAME=$FRIENDLY_NAME" >> /boot/config/plugins/minidlna/minidlna.cfg
+  echo "DB_DIR=$DB_DIR" >> /boot/config/plugins/minidlna/minidlna.cfg
+  echo "LOG_DIR=$LOG_DIR" >> /boot/config/plugins/minidlna/minidlna.cfg
+  echo "LOG_LEVEL=$LOG_LEVEL" >> /boot/config/plugins/minidlna/minidlna.cfg
+  echo "ALBUM_ART_NAMES=$ALBUM_ART_NAMES" >> /boot/config/plugins/minidlna/minidlna.cfg
+  echo "INOTIFY=$INOTIFY" >> /boot/config/plugins/minidlna/minidlna.cfg
+  echo "ENABLE_TIVO=$ENABLE_TIVO" >> /boot/config/plugins/minidlna/minidlna.cfg
+  echo "STRICT_DLNA=$STRICT_DLNA" >> /boot/config/plugins/minidlna/minidlna.cfg
+  echo "NOTIFY_INTERVAL=$NOTIFY_INTERVAL" >> /boot/config/plugins/minidlna/minidlna.cfg
+  echo "SERIAL=$SERIAL" >> /boot/config/plugins/minidlna/minidlna.cfg
+  echo "MODEL_NUMBER=$MODEL_NUMBER" >> /boot/config/plugins/minidlna/minidlna.cfg
+  echo "ROOT_CONTAINER=$ROOT_CONTAINER" >> /boot/config/plugins/minidlna/minidlna.cfg
+}
+
+# This function is new, and takes the data stored in minidlna.cfg, 
+# and turns it into a file that can be parsed by minidlnad.
+
+write_minidlna_conf_file()
+{
+  echo "# minidlna server daemon configuration file" >> /boot/config/plugins/minidlna/minidlna.conf
+  echo "port for HTTP (descriptions, SOAP, media transfer) traffic" >> /boot/config/plugins/minidlna/minidlna.conf
+  echo "port=$PORT" >> /boot/config/plugins/minidlna/minidlna.conf
+  echo "# network interface to bind to (this is the only interface that will serve files)" >> /boot/config/plugins/minidlna/minidlna.conf
+  echo "network_interface=$NETWORK_INTERFACE" >> /boot/config/plugins/minidlna/minidlna.conf
+  echo "# specify the user account name or uid to run as" >> /boot/config/plugins/minidlna/minidlna.conf
+  echo "user=$USER" >> /boot/config/plugins/minidlna/minidlna.conf
+  echo "# set this to the directory you want scanned." >> /boot/config/plugins/minidlna/minidlna.conf
+  echo "# * if have multiple directories, you can have multiple media_dir= lines" >> /boot/config/plugins/minidlna/minidlna.conf
+  echo "# * if you want to restrict a media_dir to a specific content type, you" >> /boot/config/plugins/minidlna/minidlna.conf
+  echo "#   can prepend the type, followed by a comma, to the directory:" >> /boot/config/plugins/minidlna/minidlna.conf
+  echo "#   + A for audio  (eg. media_dir=A,/home/jmaggard/Music)" >> /boot/config/plugins/minidlna/minidlna.conf
+  echo "#   + V for video  (eg. media_dir=V,/home/jmaggard/Videos)" >> /boot/config/plugins/minidlna/minidlna.conf
+  echo "#   + P for images (eg. media_dir=P,/home/jmaggard/Pictures)" >> /boot/config/plugins/minidlna/minidlna.conf
+
+  if [ "$MEDIA_DIR1" != "" ]; then
+    echo "media_dir=$MEDIA_DIR1" >> /boot/config/plugins/minidlna/minidlna.conf
+  fi
+  
+  if [ "$MEDIA_DIR2" != "" ]; then
+    echo "media_dir=$MEDIA_DIR2" >> /boot/config/plugins/minidlna/minidlna.conf
+  fi
+  
+  if [ "$MEDIA_DIR3" != "" ]; then
+    echo "media_dir=$MEDIA_DIR3" >> /boot/config/plugins/minidlna/minidlna.conf
+  fi
+  
+  if [ "$MEDIA_DIR4" != "" ]; then
+    echo "media_dir=$MEDIA_DIR4" >> /boot/config/plugins/minidlna/minidlna.conf
+  fi
+  
+  if [ "$MEDIA_DIR5" != "" ]; then
+    echo "media_dir=$MEDIA_DIR5" >> /boot/config/plugins/minidlna/minidlna.conf
+  fi
+  
+  echo "# set this if you want to customize the name that shows up on your clients" >> /boot/config/plugins/minidlna/minidlna.conf
+  echo "friendly_name=$FRIENDLY_NAME" >> /boot/config/plugins/minidlna/minidlna.conf
+  echo "# set this if you would like to specify the directory where you want MiniDLNA to store its database and album art cache" >> /boot/config/plugins/minidlna/minidlna.conf
+  echo "db_dir=$DB_DIR" >> /boot/config/plugins/minidlna/minidlna.conf
+  echo "# set this if you would like to specify the directory where you want MiniDLNA to store its log file" >> /boot/config/plugins/minidlna/minidlna.conf
+  echo "log_dir=$LOG_DIR" >> /boot/config/plugins/minidlna/minidlna.conf
+  echo "# set this to change the verbosity of the information that is logged" >> /boot/config/plugins/minidlna/minidlna.conf
+  echo "# each section can use a different level: off, fatal, error, warn, info, or debug" >> /boot/config/plugins/minidlna/minidlna.conf
+  echo "log_level=$LOG_LEVEL" >> /boot/config/plugins/minidlna/minidlna.conf
+  echo "# this should be a list of file names to check for when searching for album art" >> /boot/config/plugins/minidlna/minidlna.conf
+  echo "# note: names should be delimited with a forward slash (/)" >> /boot/config/plugins/minidlna/minidlna.conf
+  echo "album_art_names=$ALBUM_ART_NAMES" >> /boot/config/plugins/minidlna/minidlna.conf
+  echo "# set this to no to disable inotify monitoring to automatically discover new files" >> /boot/config/plugins/minidlna/minidlna.conf
+  echo "# note: the default is yes" >> /boot/config/plugins/minidlna/minidlna.conf
+  echo "inotify=$INOTIFY" >> /boot/config/plugins/minidlna/minidlna.conf
+  echo "# set this to yes to enable support for streaming .jpg and .mp3 files to a TiVo supporting HMO" >> /boot/config/plugins/minidlna/minidlna.conf
+  echo "enable_tivo=$ENABLE_TIVO" >> /boot/config/plugins/minidlna/minidlna.conf
+  echo "# set this to strictly adhere to DLNA standards." >> /boot/config/plugins/minidlna/minidlna.conf
+  echo "# * This will allow server-side downscaling of very large JPEG images," >> /boot/config/plugins/minidlna/minidlna.conf
+  echo "#   which may hurt JPEG serving performance on (at least) Sony DLNA products." >> /boot/config/plugins/minidlna/minidlna.conf
+  echo "strict_dlna=$STRICT_DLNA" >> /boot/config/plugins/minidlna/minidlna.conf
+  echo "# notify interval in seconds. default is 895 seconds." >> /boot/config/plugins/minidlna/minidlna.conf
+  echo "notify_interval=$NOTIFY_INTERVAL" >> /boot/config/plugins/minidlna/minidlna.conf
+  echo "# serial and model number the daemon will report to clients" >> /boot/config/plugins/minidlna/minidlna.conf
+  echo "# in its XML description" >> /boot/config/plugins/minidlna/minidlna.conf
+  echo "serial=$SERIAL" >> /boot/config/plugins/minidlna/minidlna.conf
+  echo "model_number=$MODEL_NUMBER" >> /boot/config/plugins/minidlna/minidlna.conf
+  echo "# Use different container as root of the tree" >> /boot/config/plugins/minidlna/minidlna.conf
+  echo "# possible values:" >> /boot/config/plugins/minidlna/minidlna.conf
+  echo "#   + . - use standard container (this is the default)" >> /boot/config/plugins/minidlna/minidlna.conf
+  echo "#   + B - Browse Directory" >> /boot/config/plugins/minidlna/minidlna.conf
+  echo "#   + M - Music" >> /boot/config/plugins/minidlna/minidlna.conf
+  echo "#   + V - Video" >> /boot/config/plugins/minidlna/minidlna.conf
+  echo "#   + P - Pictures" >> /boot/config/plugins/minidlna/minidlna.conf
+  echo "# if you specify B and the client device is audio-only then Music/Folders will be used as root" >> /boot/config/plugins/minidlna/minidlna.conf
+  echo "root_container=$ROOT_CONTAINER" >> /boot/config/plugins/minidlna/minidlna.conf
+}
+
+minidlna_change_settings()
+{
+  #nb. when passing params from enable/disable functions, params will take new numbering. ie. $2 in enable will become the first ($1) param here, and so on
+  PORT=$1
+  NETWORK_INTERFACE=$2
+  USER=$3
+  MEDIA_DIR1=$4
+  MEDIA_DIR2=$5
+  MEDIA_DIR3=$6
+  MEDIA_DIR4=$7
+  MEDIA_DIR5=$8
+  FRIENDLY_NAME=$9
+  DB_DIR=${10}
+  LOG_DIR=${11}
+  LOG_LEVEL=${12}
+  ALBUM_ART_NAMES=${13}
+
+   #crappy hack to turn 0 or 1 value back to YES/NO for correct storage in cfg
+  if [ "${14}" = "0" ]; then
+    INOTIFY=no
+  else
+    INOTIFY=yes
+  fi
+  
+  if [ "${15}" = "0" ]; then
+    ENABLE_TIVO=no
+  else
+    ENABLE_TIVO=yes
+  fi
+
+  if [ "${16}" = "0" ]; then
+    STRICT_DLNA=no
+  else
+    STRICT_DLNA=yes
+  fi
+
+  NOTIFY_INTERVAL=${17}
+  SERIAL=${18}
+  MODEL_NUMBER=${19}
+  ROOT_CONTAINER=${20}
+}
+
+minidlna_enable()
+{
+  SERVICE=$1 #enable
+  minidlna_change_settings $2 $3 $4 $5 $6 $7 $8 $9 ${10} ${11} ${12} ${13} ${14} ${15} ${16} ${17} ${18} ${19} ${20} ${21}
+  write_plugin_config
+  write_minidlna_conf_file
+  minidlna_install
+  minidlna_restart
+}
+
+minidlna_disable()
+{
+  minidlna_stop
+  SERVICE=$1 #disable
+  minidlna_change_settings $2 $3 $4 $5 $6 $7 $8 $9 ${10} ${11} ${12} ${13} ${14} ${15} ${16} ${17} ${18} ${19} ${20} ${21}
+  write_plugin_config
+  write_minidlna_conf_file
+}
+
+minidlna_updateplg()
+{
+  if [ -f /boot/config/plugins/minidlna.plg ]; then
+    minidlna_stop;
+    wget -q -P /tmp --no-check-certificate https://raw.github.com/overbyrn/UnRAID/master/minidlna.plg 2>/dev/null
+    if [ -f /tmp/minidlna.plg ]; then
+      mv -f /boot/config/plugins/minidlna.plg /boot/config/plugins/minidlna/minidlna.plg.sav 2>/dev/null
+      mv -f /tmp/minidlna.plg /boot/config/plugins/minidlna.plg 2>/dev/null
+      /usr/local/sbin/installplg /boot/config/plugins/minidlna.plg 2>/dev/null
+    fi
+    minidlna_start;
+  fi
+}
+
+minidlna_plgver()
+{
+  case "$1" in
+    'local')
+      if [ -f /boot/config/plugins/minidlna.plg ]; then
+        VERSION=$(grep "<\!ENTITY plgver" /boot/config/plugins/minidlna.plg | cut -d\" -f2)
+	  else
+	    VERSION=Unknown
+	  fi
+    ;;
+    'remote')
+      VERSION=$(wget --no-check-certificate -q https://raw.github.com/overbyrn/UnRAID/master/minidlna.plg -O - | grep "<\!ENTITY plgver" | cut -d\" -f2)
+      if [ "$VERSION" == "" ]; then
+        VERSION=Unknown
+      fi
+    ;;
+  esac
+  # nb: remember to use -n to remove CRLF as otherwise php var needs TRIM on the shell_exec line
+  echo -n "$VERSION"
+}
+
+minidlna_appver()
+{
+  case "$1" in
+    'local')
+      VERSION=$(/usr/local/minidlna/minidlnad -V 2>&1 | awk '{print $2}')
+    ;;
+    'remote')
+      #APPVER=$(wget --no-check-certificate https://dl.dropbox.com/u/572553/UnRAID/plugin.version.control/minidlna_appver.txt -q -O - |sed 's/_/-/g')
+      #VERSION=$(echo $APPVER|awk -F- '{print $3"-"$2"-"$4}') 
+      #currently not in use for this plugin.
+      VERSION=$(cat /usr/local/dropbox/.dropbox-dist/VERSION)
+      if [ "$VERSION" == "" ]; then
+        VERSION=Unknown
+      fi
+    ;;
+  esac
+  echo -n "$VERSION"
+}
+
+minidlna_getver()
+{
+  if [[ ! -z $1 && ! -z $2 ]]; then
+  case "$1" in
+    'plg')
+      minidlna_plgver $2
+    ;;
+    'app')
+      minidlna_appver $2
+    ;;
+  esac
+  else
+    echo "usage $0 getver plg|app local|remote"
+  fi
+}
+
+minidlna_datacheck()
+{
+  array=( ramfs proc tempfs sysfs )
+  fs=$( stat -f -c '%T' $DB_DIR )
+  if [ "$fs" = "msdos" ]; then
+    echo "<p style="color:red\;"><b>WARNING:</b> Your MiniDLNA media database is located on your flash drive. This can decrease the life span of your flash device!</p>"
+  else
+    for i in "${array[@]}"
+    do
+      if [ $i = $fs ]; then
+        echo "<p style="color:red\;"><b>WARNING:</b> Your MiniDLNA media database is not persistent and WILL NOT survive a reboot. The database directory maintains a library of all your media and ideally should be maintained across reboots.  Please locate your database directory on persistent storage. eg. cache/array disk</p>"
+        break
+      else
+        echo "<p style="color:green\;">Database directory located on persistent storage. Your media library will persist after a reboot :-)</p>"
+        break
+      fi
+    done
+  fi
+}
+
+# read our configuration
+source /boot/config/plugins/minidlna/minidlna.cfg
+source /boot/config/plugins/minidlna/minidlna.conf
+
+case "$1" in
+  'start')
+    minidlna_start
+  ;;
+  'stop')
+    minidlna_stop
+  ;;
+  'restart')
+    minidlna_restart
+  ;;
+  'enable')
+	minidlna_enable $1 $2 $3 $4 $5 $6 $7 $8 $9 ${10} ${11} ${12} ${13} ${14} ${15} ${16} ${17} ${18} ${19} ${20} ${21}
+  ;;
+  'disable')
+    minidlna_disable $1 $2 $3 $4 $5 $6 $7 $8 $9 ${10} ${11} ${12} ${13} ${14} ${15} ${16} ${17} ${18} ${19} ${20} ${21}
+  ;;
+  'buttonstart')
+    minidlna_buttonstart
+  ;;
+  'rescan')
+    minidlna_rescan
+  ;;
+  'updateplg')
+    minidlna_updateplg
+  ;;
+  'getver')
+    minidlna_getver $2 $3
+    ;;  
+  'datacheck')
+    minidlna_datacheck
+  ;;
+    *)
+    echo "usage $0 start|stop|restart|enable|disable|buttonstart|rescan|updateplg|getver|datacheck"
+esac
+]]>
+</INLINE>
+</FILE>
+
+<FILE Name="/usr/local/emhttp/plugins/minidlna/minidlna.png">
+<LOCAL>/boot/config/plugins/minidlna/minidlna.png</LOCAL>
+</FILE>
+
+<FILE Name="/usr/local/emhttp/plugins/minidlna/device_status.png">
+<LOCAL>/boot/config/plugins/images/device_status.png</LOCAL>
+</FILE>
+
+<FILE Name="/usr/local/emhttp/plugins/minidlna/new_config.png">
+<LOCAL>/boot/config/plugins/images/new_config.png</LOCAL>
+</FILE>
+
+<FILE Name="/usr/local/emhttp/plugins/minidlna/information.png">
+<LOCAL>/boot/config/plugins/images/information.png</LOCAL>
+</FILE>
+
+<FILE Name="/usr/local/emhttp/plugins/minidlna/minidlna.php">
+<INLINE>
+<![CDATA[
+<?PHP
+$minidlna_cfg = parse_ini_file( "/boot/config/plugins/minidlna/minidlna.cfg");
+$minidlna_localplg = shell_exec("/etc/rc.d/rc.minidlna getver plg local");
+$minidlna_remoteplg = shell_exec("/etc/rc.d/rc.minidlna getver plg remote");
+$minidlna_localapp = shell_exec("/etc/rc.d/rc.minidlna getver app local");
+$minidlna_running = file_exists( "/var/run/minidlna/minidlna.pid") ? "yes" : "no";
+$minidlna_datacheck = shell_exec ( "/etc/rc.d/rc.minidlna datacheck" );
+$controls_exist = "false";
+$updates_exist = "false";
+?>
+
+<html>
+  <head>
+    <style type="text/css">
+    .tooltip {
+        border-bottom: 1px dotted #000000; color: #000000; outline: none;
+        cursor: help; text-decoration: none;
+        position: relative;
+    }
+    .tooltip span {
+        margin-left: -999em;
+        position: absolute;
+    }
+    .tooltip:hover span {
+        border-radius: 5px 5px; -moz-border-radius: 5px; -webkit-border-radius: 5px; 
+        box-shadow: 5px 5px 5px rgba(0, 0, 0, 0.1); -webkit-box-shadow: 5px 5px rgba(0, 0, 0, 0.1); -moz-box-shadow: 5px 5px rgba(0, 0, 0, 0.1);
+        font-family: Calibri, Tahoma, Geneva, sans-serif;
+        position: absolute; left: 1em; top: 2em; z-index: 99;
+        margin-left: 0; width: 250px;
+    }
+    .classic { padding: 0.8em 1em; }
+    * html a:hover { background: transparent; }
+    .classic {background: #FFFFAA; border: 1px solid #FFAD33; }
+    </style>
+  </head>
+<body>
+
+<div style="width: 49%; float:left; border: 0px solid black;">
+  <div id="title">
+    <span class="left">Status:&nbsp;<img src='/plugins/minidlna/device_status.png'>
+      <?if ($minidlna_running=="yes"):?>
+        <span class="green"><b>minidlna is RUNNING</b></span>
+      <?else:?>
+        <span class="red"><b>minidlna is NOT RUNNING</b></span>
+      <?endif;?>
+    </span>
+  </div>
+  
+  <div style="border: 0px solid black;">
+    <span class="left">
+      <p>
+        <span class="green-text"><b><?=$minidlna_localapp?></b></span>
+          <? if ($minidlna_running=="yes"): ?>
+            <?=$minidlna_datacheck?> 
+          <?endif;?> 
+      </p>
+    </span>
+  </div>
+  
+  <br></br>
+  
+  <div style="border: 0px solid black;">
+    <table>
+      <tr style="font-weight:bold; color:#333333; background:#F0F0F0; text-shadow:0 1px 1px #FFFFFF;">
+        <td>Plugin</td>
+        <td>Local Version</td>
+        <td>Online Version</td>
+      </tr>
+      <tr style="font-weight:bold; background:#FFFFFF;">
+        <td>minidlna Plugin</td>
+        <td>
+          <?if ($minidlna_localplg != "Unknown"):?>
+              <span class="green-text"><?=$minidlna_localplg?></span>
+          <?else:?>
+            <span class="red-text">UNKNOWN</span>
+          <?endif;?>
+        </td>
+        <td>
+          <?if ($minidlna_remoteplg != "Unknown"):?>
+              <span class="green-text"><?=$minidlna_remoteplg?></span>
+          <?else:?>
+            <span class="red-text">UNKNOWN</span>
+          <?endif;?>
+        </td>
+      </tr>
+    </table>
+  </div>
+
+  <br></br>
+
+  <div>
+    <table>
+      <tr style="font-weight:bold; color:#333333; background:#F0F0F0; text-shadow:0 1px 1px #FFFFFF;">
+        <td colspan="2">Control Actions</td>
+      </tr>
+
+      <?if ($minidlna_running=="yes"):?>
+        <tr>
+        <td width="30%">
+          <form name="minidlna_start_stop" method="POST" action="/plugins/minidlna/minidlnactl.php" target="progressFrame">
+            <input type="hidden" name="cmd" value="stop">
+            <input type="submit" name="runCmd" value="Stop">
+          </form>
+        </td>
+        <td>Stop minidlna Daemon</td>
+        </tr>
+        <tr>
+        <td width="30%">
+          <form name="minidlna_restart" method="POST" action="/plugins/minidlna/minidlnactl.php" target="progressFrame">
+            <input type="hidden" name="cmd" value="restart">
+            <input type="submit" name="runCmd" value="Restart">
+          </form>
+        </td>
+        <td>Restart minidlna Daemon</td>
+        </tr>
+        <?$controls_exist = "true"?>
+      <?else:?>
+        <tr>
+        <td width="30%">
+          <form name="minidlna_start" method="POST" action="/plugins/minidlna/minidlnactl.php" target="progressFrame">
+            <input type="hidden" name="cmd" value="buttonstart">
+            <input type="submit" name="runCmd" value="Start">
+          </form>
+        </td>
+        <td>Start minidlna Daemon</td>
+        </tr>
+        <?$controls_exist = "true"?>
+      <?endif;?>
+      <?if ($controls_exist=="false"):?>
+        <tr>
+          <td colspan="2" align="center">No Control Actions available</td>
+        </tr>
+      <?endif;?>
+    </table>
+  </div>
+  <br></br>
+  <div style="border: 0px solid black;">
+    <table>
+      <tr style="font-weight:bold; color:#333333; background:#F0F0F0; text-shadow:0 1px 1px #FFFFFF;">
+        <td colspan="2">Updates</td>
+      </tr>
+      <?if (($minidlna_remoteplg != $minidlna_localplg) && ($minidlna_localplg != "Unknown") && ($minidlna_remoteplg != "Unknown")): ?>
+        <tr>
+        <td width="30%">
+          <form name="minidlna_updateplg" method="POST" action="/plugins/minidlna/minidlnactl.php" target="progressFrame">
+            <input type="hidden" name="cmd" value="updateplg">
+            <input type="submit" name="runCmd" value="Update Plugin">
+          </form>
+        </td>
+        <td><span class="red-text">An update is available to the plugin</span></td>
+        </tr>
+        <?$updates_exist="true"?>
+      <?endif;?>
+
+      <?if ($updates_exist=="false"):?>
+        <tr>
+          <td colspan="2" align="center">No updates available at this time</td>
+        </tr>
+      <?endif;?>
+    </table>
+  </div>
+  <br></br>
+  <br></br>
+</div>
+
+<div style="width: 49%; float:right; border: 0px solid black;">
+  <div id="title">
+    <span class="left">Configuration:&nbsp;<img src='/plugins/minidlna/new_config.png'></span>
+  </div>
+  <form name="minidlna_settings" id="minidlna_settings" method="POST" action="/plugins/minidlna/minidlnactl.php" target="progressFrame" onsubmit="return validateForm();">
+  <!--note to self: the /return/ in the onsubmit event is important as without it, the submit action is still processed-->
+    <input type="hidden" name="cmd" value="apply">  
+    <table class="settings">
+      <tr>
+      <td>Enable minidlna:</td>
+      <td><select name="SERVICE" size="1"  onChange="checkRUNNING(this.form);">
+         <?=mk_option($minidlna_cfg['SERVICE'], "disable", "No");?>
+         <?=mk_option($minidlna_cfg['SERVICE'], "enable", "Yes");?>
+         </select></td>
+      </tr>
+      <tr>
+
+      <tr>
+      <td><a class="tooltip" href="#">Port:<span class="classic">Port for HTTP (descriptions, SOAP, media transfer) traffic</span></a></td>
+      <td>
+      <input type="text" name="PORT" value="<?=$minidlna_cfg['PORT'];?>" title="Value can be any number from 1 to 65535. Port numbers less than 256 are reserved for well known services (like HTTP on port 80). Port numbers less than 1024 require root access on UNIX system.">
+      </td>
+      </tr> 
+
+      <tr>
+      <td><a class="tooltip" href="#">Network Interface:<span class="classic">Network interface to bind to (this is the only interface that will serve files)</span></a></td>
+      <td>
+      <input type="text" name="NETWORK_INTERFACE" value="<?=$minidlna_cfg['NETWORK_INTERFACE'];?>" title="Default is eth0, but can be set to any valid unRAID network interface">
+      </td>
+      </tr> 
+
+      <tr>
+      <td><a class="tooltip" href="#">User to run as:<span class="classic">The unRAID user that the service will run under</span></a></td>
+      <td>
+      <input type="text" name="USER" value="<?=$minidlna_cfg['USER'];?>" title="Default is nobody, but can be set to any valid unRAID user">
+      </td>
+      </tr> 
+
+      <tr>
+      <td><a class="tooltip" href="#">Media Directory 1:<span class="classic">Set this to the directory you want to be scanned</span></a></td>
+      <td>
+      <input type="text" name="MEDIA_DIR1" value="<?=$minidlna_cfg['MEDIA_DIR1'];?>" title="This can be any valid unRAID directory path">
+      </td>
+      </tr> 
+
+      <tr>
+      <td><a class="tooltip" href="#">Media Directory 2:<span class="classic">Set this to the directory you want to be scanned</span></a></td>
+      <td>
+      <input type="text" name="MEDIA_DIR2" value="<?=$minidlna_cfg['MEDIA_DIR2'];?>" title="This can be any valid unRAID directory path">
+      </td>
+      </tr> 
+      
+      <tr>
+      <td><a class="tooltip" href="#">Media Directory 3:<span class="classic">Set this to the directory you want to be scanned</span></a></td>
+      <td>
+      <input type="text" name="MEDIA_DIR3" value="<?=$minidlna_cfg['MEDIA_DIR3'];?>" title="This can be any valid unRAID directory path">
+      </td>
+      </tr> 
+
+      <tr>
+      <td><a class="tooltip" href="#">Media Directory 4:<span class="classic">Set this to the directory you want to be scanned</span></a></td>
+      <td>
+      <input type="text" name="MEDIA_DIR4" value="<?=$minidlna_cfg['MEDIA_DIR4'];?>" title="This can be any valid unRAID directory path">
+      </td>
+      </tr> 
+
+      <tr>
+      <td><a class="tooltip" href="#">Media Directory 5:<span class="classic">Set this to the directory you want to be scanned</span></a></td>
+      <td>
+      <input type="text" name="MEDIA_DIR5" value="<?=$minidlna_cfg['MEDIA_DIR5'];?>" title="This can be any valid unRAID directory path">
+      </td>
+      </tr> 
+
+      <tr>
+      <td><a class="tooltip" href="#">Friendly Name:<span class="classic">Set this to customize the name that shows up on your clients</span></a></td>
+      <td>
+      <input type="text" name="FRIENDLY_NAME" value="<?=$minidlna_cfg['FRIENDLY_NAME'];?>" title="This can be any name you choose">
+      </td>
+      </tr> 
+
+      <tr>
+      <td><a class="tooltip" href="#">Database Directory:<span class="classic">Set this to the directory where you want to store the media library</span></a></td>
+      <td>
+      <input type="text" name="LOG_DIR" value="<?=$minidlna_cfg['LOG_DIR'];?>" title="The media library is best stored on your cache drive, or user share">
+      </td>
+      </tr> 
+
+      <tr>
+      <td><a class="tooltip" href="#">Log Directory:<span class="classic">Set this to the directory where you want the minidlna log files stored</span></a></td>
+      <td>
+      <input type="text" name="LOG_DIR" value="<?=$minidlna_cfg['LOG_DIR'];?>" title="If you wish logs to be persistent, set this to point to your cache drive">
+      </td>
+      </tr> 
+
+      <tr>
+      <td><a class="tooltip" href="#">Log Level:<span class="classic">Set this to change the verbosity of the information that it logged</span></a></td>
+      <td>
+      <input type="text" name="LOG_LEVEL" value="<?=$minidlna_cfg['LOG_LEVEL'];?>" title="Each section can use a different level: off, fatal, error, warn, info, or debug">
+      </td>
+      </tr> 
+
+      <tr>
+      <td><a class="tooltip" href="#">Album Art Names:<span class="classic">This should be a list of file names to check for when searching for album art</span></a></td>
+      <td>
+      <input type="text" name="ALBUM_ART_NAMES" value="<?=$minidlna_cfg['ALBUM_ART_NAMES'];?>" title="Names should be delimited with a forward slash (/)">
+      </td>
+      </tr> 
+
+      <tr>
+      <td><a class="tooltip" href="#">Use inotify:<span class="classic">If set to YES, minidlna will use inotify to automatically discover new files</span></a></td>
+      <td>
+      <select name="INOTIFY" size="1" onChange="checkRUNNING(this.form);">
+        <?=mk_option($minidlna_cfg['INOTIFY'], 0, "No");?>
+        <?=mk_option($minidlna_cfg['INOTIFY'], 1, "Yes");?>
+      </select>
+      </td>
+      </tr>      
+      <tr>
+
+      <tr>
+      <td><a class="tooltip" href="#">Enable TiVo:<span class="classic">Set this to enable support for streaming .jpg and .mp3 files to a TiVo supporting HMO</span></a></td>
+      <td>
+      <select name="ENABLE_TIVO" size="1" onChange="checkRUNNING(this.form);">
+        <?=mk_option($minidlna_cfg['ENABLE_TIVO'], 0, "No");?>
+        <?=mk_option($minidlna_cfg['ENABLE_TIVO'], 1, "Yes");?>
+      </select>
+      </td>
+      </tr>      
+      <tr>
+
+      <tr>
+      <td><a class="tooltip" href="#">Strict DLNA:<span class="classic">This will allow server-side downscaling of very large JPEG images, which may hurt JPEG serving performance on (at least) Sony DLNA products</span></a></td>
+      <td>
+      <select name="STRICT_DLNA" size="1" onChange="checkRUNNING(this.form);">
+        <?=mk_option($minidlna_cfg['STRICT_DLNA'], 0, "No");?>
+        <?=mk_option($minidlna_cfg['STRICT_DLNA'], 1, "Yes");?>
+      </select>
+      </td>
+      </tr>      
+      <tr>
+
+      <tr>
+      <td><a class="tooltip" href="#">Notify Interval:<span class="classic">Sets the interval between searches for new media</span></a></td>
+      <td>
+      <input type="text" name="NOTIFY_INTERVAL" value="<?=$minidlna_cfg['NOTIFY_INTERVAL'];?>" title="Interval value is set in seconds. If you find that DLNA clients disconnect every 10-30 minutes, set this to a very high number (90000)">
+      </td>
+      </tr> 
+
+      <tr>
+      <td><a class="tooltip" href="#">Serial Number:<span class="classic">Serial number that minidlna will report to clients</span></a></td>
+      <td>
+      <input type="text" name="SERIAL_NUMBER" value="<?=$minidlna_cfg['SERIAL_NUMBER'];?>" title="This can be any positive integer. Only change this if you really need to">
+      </td>
+      </tr> 
+
+      <tr>
+      <td><a class="tooltip" href="#">Model Number:<span class="classic">Model number that minidlna will report to clients</span></a></td>
+      <td>
+      <input type="text" name="MODEL_NUMBER" value="<?=$minidlna_cfg['MODEL_NUMBER'];?>" title="This can be any positive integer. Only change this if you really need to">
+      </td>
+      </tr> 
+
+      <tr>
+      <td><a class="tooltip" href="#">Root Container:<span class="classic">Use different container as root of the tree</span></a></td>
+      <td>
+      <input type="text" name="ROOT_CONTAINER" value="<?=$minidlna_cfg['ROOT_CONTAINER'];?>" title=". - use standard container (this is the default). B - Browse Directory. M - Music. V - Video. P - Pictures. ">
+      </td>
+      </tr> 
+
+    </table>
+
+    <div align="center">
+      <hr size="3" align="center" width="75%" color="grey" style="margin-top:20px;margin-bottom:18px">
+      <input type="submit" name="runCmd" value="Apply"><button type="button" onClick="done();">Done</button>      
+    </div>
+  </form>
+  <br></br>
+  <br></br>
+</div>
+
+<script type="text/javascript">
+function onLoad() {
+  // do nothing
+}
+
+function checkRUNNING(form) {
+   if ("<?=$minidlna_running;?>" == "yes") {
+    form.PORT.disabled = true;
+    form.NETWORK_INTERFACE.disabled = true;
+    form.USER.disabled = true;
+    form.MEDIA_DIR1.disabled = true;
+    form.MEDIA_DIR2.disabled = true;
+    form.MEDIA_DIR3.disabled = true;
+    form.MEDIA_DIR4.disabled = true;
+    form.MEDIA_DIR5.disabled = true;
+    form.FRIENDLY_NAME.disabled = true;
+    form.DB_DIR.disabled = true;
+    form.LOG_DIR.disabled = true;
+    form.LOG_LEVEL.disabled = true;
+    form.ALBUM_ART_NAMES.disabled = true;
+    form.INOTIFY.disabled = true;
+    form.ENABLE_TIVO.disabled = true;
+    form.STRICT_DLNA.disabled = true;
+    form.NOTIFY_INTERVAL.disabled = true;
+    form.SERIAL.disabled = true;
+    form.MODEL_NUMBER.disabled = true;
+    form.ROOT_CONTAINER.disabled = true;
+   }
+}
+
+function validateForm() {
+  document.forms["minidlna_settings"]["PORT"].disabled = false;  
+  document.forms["minidlna_settings"]["NETWORK_INTERFACE"].disabled = false;
+  document.forms["minidlna_settings"]["USER"].disabled = false;
+  document.forms["minidlna_settings"]["MEDIA_DIR1"].disabled = false;
+  document.forms["minidlna_settings"]["MEDIA_DIR2"].disabled = false;
+  document.forms["minidlna_settings"]["MEDIA_DIR3"].disabled = false;
+  document.forms["minidlna_settings"]["MEDIA_DIR4"].disabled = false;
+  document.forms["minidlna_settings"]["MEDIA_DIR5"].disabled = false;      
+  document.forms["minidlna_settings"]["FRIENDLY_NAME"].disabled = false;
+  document.forms["minidlna_settings"]["DB_DIR"].disabled = false;
+  document.forms["minidlna_settings"]["LOG_DIR"].disabled = false;
+  document.forms["minidlna_settings"]["LOG_LEVEL"].disabled = false;
+  document.forms["minidlna_settings"]["ALBUM_ART_NAMES"].disabled = false;
+  document.forms["minidlna_settings"]["INOTIFY"].disabled = false;
+  document.forms["minidlna_settings"]["ENABLE_TIVO"].disabled = false;
+  document.forms["minidlna_settings"]["STRICT_DLNA"].disabled = false;
+  document.forms["minidlna_settings"]["NOTIFY_INTERVAL"].disabled = false;
+  document.forms["minidlna_settings"]["SERIAL"].disabled = false;
+  document.forms["minidlna_settings"]["MODEL_NUMBER"].disabled = false;
+  document.forms["minidlna_settings"]["ROOT_CONTAINER"].disabled = false;    
+
+  return (true);
+}
+
+onLoad();
+checkRUNNING(document.minidlna_settings);
+</script>
+</body>
+</html>
+]]>
+</INLINE>
+</FILE>
+
+<FILE Name="/usr/local/emhttp/plugins/minidlna/minidlnactl.php" Mode="0770">
+<INLINE>
+<![CDATA[
+<?PHP
+  $logfile = "/var/log/plugins/minidlna";
+  $configfile = "/boot/config/plugins/minidlna/minidlna.cfg";
+
+  if (empty($_SERVER['SHELL']))
+    $newline = "<br>";
+  else
+    $newline = "\n";
+
+  $cur_dt = date("F j\, Y h:i:s A");
+  write_log("\nStart: $cur_dt");
+ 
+  $settings = array(
+    "SERVICE",
+    "PORT",
+    "NETWORK_INTERFACE",
+    "USER",
+    "MEDIA_DIR1",
+    "MEDIA_DIR2",
+    "MEDIA_DIR3",
+    "MEDIA_DIR4",
+    "MEDIA_DIR5",
+    "FRIENDLY_NAME",
+    "DB_DIR",
+    "LOG_DIR",
+    "LOG_LEVEL",
+    "ALBUM_ART_NAMES",
+    "INOTIFY",
+    "ENABLE_TIVO",
+    "STRICT_DLNA",
+    "NOTIFY_INTERVAL",
+    "SERIAL",
+    "MODEL_NUMBER",
+    "ROOT_CONTAINER",    
+  );
+  
+  
+  parse_str($argv[1],$_POST);
+
+  $SERVICE=$_POST['SERVICE'];
+  $PORT=$_POST['PORT'];
+  $NETWORK_INTERFACE=$_POST['NETWORK_INTERFACE'];
+  $USER=$_POST['USER'];
+  $MEDIA_DIR1=$_POST['MEDIA_DIR1'];
+  $MEDIA_DIR2=$_POST['MEDIA_DIR2'];
+  $MEDIA_DIR3=$_POST['MEDIA_DIR3'];
+  $MEDIA_DIR4=$_POST['MEDIA_DIR4'];
+  $MEDIA_DIR5=$_POST['MEDIA_DIR5'];
+  $FRIENDLY_NAME=$_POST['FRIENDLY_NAME'];
+  $DB_DIR=$_POST['DB_DIR'];
+  $LOG_DIR=$_POST['LOG_DIR'];
+  $LOG_LEVEL=$_POST['LOG_LEVEL'];
+  $ALBUM_ART_NAMES=$_POST['ALBUM_ART_NAMES'];
+  $INOTIFY=$_POST['INOTIFY'];
+  $ENABLE_TIVO=$_POST['ENABLE_TIVO'];
+  $STRICT_DLNA=$_POST['STRICT_DLNA'];
+  $NOTIFY_INTERVAL=$_POST['NOTIFY_INTERVAL'];
+  $SERIAL=$_POST['SERIAL'];
+  $MODEL_NUMBER=$_POST['MODEL_NUMBER'];
+  $ROOT_CONTAINER=$_POST['ROOT_CONTAINER'];
+
+  switch ($_POST['cmd']) {
+    case 'apply':
+      if ($SERVICE == "enable") {
+        enableminidlna();
+      }
+      else
+        disableminidlna();
+      break;
+    case 'buttonstart':
+      buttonstartminidlna();
+      break;
+    case 'restart':
+      restartminidlna();
+      break;
+    case 'stop':
+      stopminidlna();
+      break;
+    case 'updateplg':
+      updateminidlna();
+      break;
+    default:
+    break;
+  }
+
+  if (empty($_SERVER['SHELL'])) {
+    echo("<html>");
+    echo("<head><script>var goback=parent.location;</script></head>");
+    echo("<body onLoad=\"parent.location=goback;\"></body>");
+    echo("</html>");
+  }
+  
+  $cur_dt = date("F j\, Y h:i:s A");
+  write_log("\nEnd: $cur_dt");
+  
+  function startminidlna() {
+    global $newline, $log;
+    exec_log("/etc/rc.d/rc.minidlna start");
+  }
+
+  function buttonstartminidlna() {
+    global $newline, $log;
+    exec_log("/etc/rc.d/rc.minidlna buttonstart");
+  }
+
+  function restartminidlna() {
+    global $newline, $log;
+    exec_log("/etc/rc.d/rc.minidlna restart");
+  }
+  
+  function stopminidlna() {
+    global $newline, $log;
+    exec_log("/etc/rc.d/rc.minidlna stop");
+  }
+
+  function updateminidlna() {
+    global $newline, $log;
+    exec_log("/etc/rc.d/rc.minidlna updateplg");
+  }
+  
+  function enableminidlna() {
+    global $newline, $log, $SERVICE, $PORT, $NETWORK_INTERFACE, $USER, $MEDIA_DIR1, $MEDIA_DIR2, $MEDIA_DIR3, $MEDIA_DIR4, $MEDIA_DIR5, $FRIENDLY_NAME, $DB_DIR, $LOG_DIR, $LOG_LEVEL, $ALBUM_ART_NAMES, $INOTIFY, $ENABLE_TIVO, $STRICT_DLNA, $NOTIFY_INTERVAL, $SERIAL, $MODEL_NUMBER, $ROOT_CONTAINER;
+
+    exec_log("/etc/rc.d/rc.minidlna $SERVICE $PORT $NETWORK_INTERFACE $USER $MEDIA_DIR1 $MEDIA_DIR2 $MEDIA_DIR3 $MEDIA_DIR4 $MEDIA_DIR5 $FRIENDLY_NAME $DB_DIR $LOG_DIR $LOG_LEVEL $ALBUM_ART_NAMES $INOTIFY $ENABLE_TIVO $STRICT_DLNA $NOTIFY_INTERVAL $SERIAL $MODEL_NUMBER $ROOT_CONTAINER"); 
+  }
+
+  function disableminidlna() {
+    global $newline, $log, $SERVICE, $PORT, $NETWORK_INTERFACE, $USER, $MEDIA_DIR1, $MEDIA_DIR2, $MEDIA_DIR3, $MEDIA_DIR4, $MEDIA_DIR5, $FRIENDLY_NAME, $DB_DIR, $LOG_DIR, $LOG_LEVEL, $ALBUM_ART_NAMES, $INOTIFY, $ENABLE_TIVO, $STRICT_DLNA, $NOTIFY_INTERVAL, $SERIAL, $MODEL_NUMBER, $ROOT_CONTAINER;
+    //echo "<script type='text/javascript'>alert('DAEMON_PURGE: $DAEMON_PURGE');</script>";
+    exec_log("/etc/rc.d/rc.minidlna $SERVICE $PORT $NETWORK_INTERFACE $USER $MEDIA_DIR1 $MEDIA_DIR2 $MEDIA_DIR3 $MEDIA_DIR4 $MEDIA_DIR5 $FRIENDLY_NAME $DB_DIR $LOG_DIR $LOG_LEVEL $ALBUM_ART_NAMES $INOTIFY $ENABLE_TIVO $STRICT_DLNA $NOTIFY_INTERVAL $SERIAL $MODEL_NUMBER $ROOT_CONTAINER"); 
+  }
+   
+  function exec_log($cmd) {
+    $results = exec($cmd);    
+    $results = "\nCMD: $cmd \nResults: $results";
+    write_log($results);
+  }
+
+  function write_log($contents) {
+    global $logfile;
+    write_string($logfile, "$contents\n", FALSE);
+  }
+    
+  function write_string ($file, $contents, $overwrite) {
+    if (file_exists($file)) {
+      if ($overwrite)
+          unlink($file);
+          touch($file);
+    }
+    else {
+      touch($file);
+    }
+    
+    $fp = @fopen($file, 'a');
+    @flock($fp, LOCK_EX);
+    @fwrite($fp, $contents);
+    @flock($fp, LOCK_UN);
+    @fclose($fp);
+  }
+
+?>
+]]>
+</INLINE>
+</FILE>
+
+<!-- event handler -->
+<FILE Name="/usr/local/emhttp/plugins/minidlna/event/disks_mounted" Mode="0770">
+<INLINE>
+#!/bin/bash
+# include our config vars and check if the service is set to enable.  if so, bring it up
+source /boot/config/plugins/minidlna/minidlna.cfg
+[[ $SERVICE = "enable" ]] &amp;&amp; /etc/rc.d/rc.minidlna buttonstart
+</INLINE>
+</FILE>
+
+<!-- event handler to stop minidlna when unmounting disks -->
+<FILE Name="/usr/local/emhttp/plugins/minidlna/event/unmounting_disks" Mode="0770">
+<INLINE>
+#!/bin/bash
+/etc/rc.d/rc.minidlna stop
+</INLINE>
+</FILE>
+
+<FILE Name="/tmp/plugin-install" Run="/bin/bash">
+<INLINE>
+#!/bin/bash
+# create minidlna writable directory for pid file
+if [ ! -e /var/run/minidlna ]; then
+  mkdir -m 0777 /var/run/minidlna
+  chown nobody:users /var/run/minidlna
+fi
+
+# create minidlna application directory
+mkdir -p &ram;
+  
+# set permissions on application directory
+chown -R root:users &ram;
+chmod -R go-rwx,u-x,g+u,ug+X &ram;
+
+# create directory under /tmp for minidlna extraction
+mkdir /tmp/minidlna
+
+# untar minidlna file to tmp directory
+tar -zxvf &plg;/minidlna_1.1.0_static.tar.gz -C /tmp/minidlna
+
+# install minidlna
+cp /tmp/minidlna/usr/sbin/minidlnad &ram;
+cp /tmp/minidlna/etc/minidlna.conf &ram;/minidlna.conf.example
+cd /tmp/minidlna/usr/share
+cp -r locale /usr/share
+
+#clean-up tmp
+rm -rf /tmp/minidlna
+
+rm /tmp/plugin-install
+</INLINE>
+</FILE>
+
+<FILE Name="/usr/local/emhttp/plugins/minidlna/minidlna.page">
+<INLINE>
+Menu="NetworkServices"
+Icon="minidlna.png"
+Version=&plgver;
+Author=&author;
+Type="php"
+Title=&plugin;
+</INLINE>
+</FILE>
+
+<FILE Name="/var/log/plugins/minidlna">
+<INLINE>
+&plugin; v&plgver;
+</INLINE>
+</FILE>
+
+<FILE Name="/tmp/plugin-development" Run="/bin/bash">
+<INLINE>
+if [ "&dev;" == "true" ]; then
+  if [ -f /boot/config/plugins/minidlna.php ]; then
+    rm -f &gui;/minidlna/minidlna.php
+    ln -s /boot/config/plugins/minidlna.php &gui;/minidlna/minidlna.php
+  else
+    mv &gui;/minidlna/minidlna.php /boot/config/plugins/minidlna.php
+    ln -s /boot/config/plugins/minidlna.php &gui;/minidlna/minidlna.php
+  fi
+  if [ -f /boot/config/plugins/minidlnactl.php ]; then
+    rm -f &gui;/minidlna/minidlnactl.php
+    ln -s /boot/config/plugins/minidlnactl.php &gui;/minidlna/minidlnactl.php
+  else
+    mv &gui;/minidlna/minidlnactl.php /boot/config/plugins/minidlnactl.php
+    ln -s /boot/config/plugins/minidlnactl.php &gui;/minidlna/minidlnactl.php
+  fi  
+  if [ -f /boot/config/plugins/rc.minidlna ]; then
+    rm -f /etc/rc.d/rc.minidlna
+    ln -s /boot/config/plugins/rc.minidlna /etc/rc.d/rc.minidlna
+  else
+    mv /etc/rc.d/rc.minidlna /boot/config/plugins/rc.minidlna
+    ln -s /boot/config/plugins/rc.minidlna /etc/rc.d/rc.minidlna
+  fi
+fi
+
+rm /tmp/plugin-development
+</INLINE>
+</FILE>
+
+</PLUGIN>
