@@ -111,6 +111,8 @@ rm /tmp/plugin-cleanup
 </INLINE>
 </FILE>
 
+# Need to put 'nodir' into the media dir entries, otherwise when we source the file to read it, things get out of shape.
+
 <FILE Name="/boot/config/plugins/minidlna/minidlna.cfg">
 <INLINE>
 # minidlna plugin configuration
@@ -119,10 +121,10 @@ PORT=8200
 NETWORK_INTERFACE=eth0
 USER=nobody
 MEDIA_DIR1=/opt
-MEDIA_DIR2=
-MEDIA_DIR3=
-MEDIA_DIR4=
-MEDIA_DIR5=
+MEDIA_DIR2=nodir
+MEDIA_DIR3=nodir
+MEDIA_DIR4=nodir
+MEDIA_DIR5=nodir
 FRIENDLY_NAME=unRAID
 DB_DIR=/var/cache/minidlna
 LOG_DIR=/var/log/plugins/minidlna
@@ -256,23 +258,23 @@ write_minidlna_conf_file()
   echo "#   + V for video  (eg. media_dir=V,/home/jmaggard/Videos)" >> /boot/config/plugins/minidlna/minidlna.conf
   echo "#   + P for images (eg. media_dir=P,/home/jmaggard/Pictures)" >> /boot/config/plugins/minidlna/minidlna.conf
 
-  if [ "$MEDIA_DIR1" != "" ]; then
+  if [ "$MEDIA_DIR1" != "nodir" ]; then
     echo "media_dir=$MEDIA_DIR1" >> /boot/config/plugins/minidlna/minidlna.conf
   fi
   
-  if [ "$MEDIA_DIR2" != "" ]; then
+  if [ "$MEDIA_DIR2" != "nodir" ]; then
     echo "media_dir=$MEDIA_DIR2" >> /boot/config/plugins/minidlna/minidlna.conf
   fi
   
-  if [ "$MEDIA_DIR3" != "" ]; then
+  if [ "$MEDIA_DIR3" != "nodir" ]; then
     echo "media_dir=$MEDIA_DIR3" >> /boot/config/plugins/minidlna/minidlna.conf
   fi
   
-  if [ "$MEDIA_DIR4" != "" ]; then
+  if [ "$MEDIA_DIR4" != "nodir" ]; then
     echo "media_dir=$MEDIA_DIR4" >> /boot/config/plugins/minidlna/minidlna.conf
   fi
   
-  if [ "$MEDIA_DIR5" != "" ]; then
+  if [ "$MEDIA_DIR5" != "nodir" ]; then
     echo "media_dir=$MEDIA_DIR5" >> /boot/config/plugins/minidlna/minidlna.conf
   fi
   
