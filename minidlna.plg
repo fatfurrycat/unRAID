@@ -212,7 +212,7 @@ minidlna_rescan()
 
 write_plugin_config()
 {
-  echo "# minidlna plugin configuration file" >> /boot/config/plugins/minidlna/minidlna.cfg
+  echo "# minidlna plugin configuration file" > /boot/config/plugins/minidlna/minidlna.cfg
   echo "SERVICE=$SERVICE" >> /boot/config/plugins/minidlna/minidlna.cfg
   echo "PORT=$PORT" >> /boot/config/plugins/minidlna/minidlna.cfg
   echo "NETWORK_INTERFACE=$NETWORK_INTERFACE" >> /boot/config/plugins/minidlna/minidlna.cfg
