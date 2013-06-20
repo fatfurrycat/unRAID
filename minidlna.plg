@@ -9,7 +9,7 @@
 <!ENTITY img "/boot/config/plugins/images">
 <!ENTITY gui "/usr/local/emhttp/plugins">
 <!ENTITY ram "/usr/local/minidlna">
-<!ENTITY url1 "https://raw.github.com/overbyrn/UnRAID/master">
+<!ENTITY url1 "https://raw.github.com/fatfurrycat/unRAID/master">
 <!ENTITY url2 "https://dl.dropbox.com/u/3094307/unRAID">
 <!ENTITY dev "true"><!-- set to "true" during plugin development -->
 ]>
@@ -379,7 +379,7 @@ minidlna_updateplg()
 {
   if [ -f /boot/config/plugins/minidlna.plg ]; then
     minidlna_stop;
-    wget -q -P /tmp --no-check-certificate https://raw.github.com/overbyrn/UnRAID/master/minidlna.plg 2>/dev/null
+    wget -q -P /tmp --no-check-certificate https://raw.github.com/fatfurrycat/unRAID/master/minidlna.plg 2>/dev/null
     if [ -f /tmp/minidlna.plg ]; then
       mv -f /boot/config/plugins/minidlna.plg /boot/config/plugins/minidlna/minidlna.plg.sav 2>/dev/null
       mv -f /tmp/minidlna.plg /boot/config/plugins/minidlna.plg 2>/dev/null
@@ -400,7 +400,7 @@ minidlna_plgver()
 	  fi
     ;;
     'remote')
-      VERSION=$(wget --no-check-certificate -q https://raw.github.com/overbyrn/UnRAID/master/minidlna.plg -O - | grep "<\!ENTITY plgver" | cut -d\" -f2)
+      VERSION=$(wget --no-check-certificate -q https://raw.github.com/fatfurrycat/unRAID/master/minidlna.plg -O - | grep "<\!ENTITY plgver" | cut -d\" -f2)
       if [ "$VERSION" == "" ]; then
         VERSION=Unknown
       fi
