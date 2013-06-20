@@ -127,7 +127,7 @@ FRIENDLY_NAME=unRAID
 DB_DIR=/var/cache/minidlna
 LOG_DIR=/var/log/plugins/minidlna
 LOG_LEVEL=general,artwork,database,inotify,scanner,metadata,http,ssdp,tivo=warn
-ALBUM_ART_NAMES=Cover.jpg/cover.jpg/AlbumArtSmall.jpg/albumartsmall.jpg/AlbumArt.jpg/albumart.jpg/Album.jpg/album.jpg/Folder.jpg/folder.jpg/Thumb.jpg/thumb.jpg
+ALBUM_ART_NAMES="Cover.jpg/cover.jpg/AlbumArtSmall.jpg/albumartsmall.jpg/AlbumArt.jpg/albumart.jpg/Album.jpg/album.jpg/Folder.jpg/folder.jpg/Thumb.jpg/thumb.jpg"
 INOTIFY=yes
 ENABLE_TIVO=no
 STRICT_DLNA=no
@@ -226,7 +226,7 @@ write_plugin_config()
   echo "DB_DIR=$DB_DIR" >> /boot/config/plugins/minidlna/minidlna.cfg
   echo "LOG_DIR=$LOG_DIR" >> /boot/config/plugins/minidlna/minidlna.cfg
   echo "LOG_LEVEL=$LOG_LEVEL" >> /boot/config/plugins/minidlna/minidlna.cfg
-  echo "ALBUM_ART_NAMES=$ALBUM_ART_NAMES" >> /boot/config/plugins/minidlna/minidlna.cfg
+  echo "ALBUM_ART_NAMES=\"$ALBUM_ART_NAMES\"" >> /boot/config/plugins/minidlna/minidlna.cfg
   echo "INOTIFY=$INOTIFY" >> /boot/config/plugins/minidlna/minidlna.cfg
   echo "ENABLE_TIVO=$ENABLE_TIVO" >> /boot/config/plugins/minidlna/minidlna.cfg
   echo "STRICT_DLNA=$STRICT_DLNA" >> /boot/config/plugins/minidlna/minidlna.cfg
@@ -773,7 +773,7 @@ $updates_exist = "false";
       <tr>
       <td><a class="tooltip" href="#">Database Directory:<span class="classic">Set this to the directory where you want to store the media library</span></a></td>
       <td>
-      <input type="text" name="LOG_DIR" value="<?=$minidlna_cfg['LOG_DIR'];?>" title="The media library is best stored on your cache drive, or user share">
+      <input type="text" name="DB_DIR" value="<?=$minidlna_cfg['DB_DIR'];?>" title="The media library is best stored on your cache drive, or user share">
       </td>
       </tr> 
 
@@ -841,7 +841,7 @@ $updates_exist = "false";
       <tr>
       <td><a class="tooltip" href="#">Serial Number:<span class="classic">Serial number that minidlna will report to clients</span></a></td>
       <td>
-      <input type="text" name="SERIAL_NUMBER" value="<?=$minidlna_cfg['SERIAL_NUMBER'];?>" title="This can be any positive integer. Only change this if you really need to">
+      <input type="text" name="SERIAL" value="<?=$minidlna_cfg['SERIAL'];?>" title="This can be any positive integer. Only change this if you really need to">
       </td>
       </tr> 
 
