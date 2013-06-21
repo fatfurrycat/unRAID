@@ -392,19 +392,23 @@ minidlna_change_settings()
 
 minidlna_enable()
 {
+  # sleep 2 is required, as changes to plugin .cfg file aren't replicated into .conf file reliably without it
   SERVICE=$1 #enable
   minidlna_change_settings $2 $3 $4 $5 $6 $7 $8 $9 ${10} ${11} ${12} ${13} ${14} ${15} ${16} ${17} ${18} ${19} ${20} ${21}
   write_plugin_config
+  sleep 2
   write_minidlna_conf_file
   minidlna_restart
 }
 
 minidlna_disable()
 {
+  # sleep 2 is required, as changes to plugin .cfg file aren't replicated into .conf file reliably without it
   minidlna_stop
   SERVICE=$1 #disable
   minidlna_change_settings $2 $3 $4 $5 $6 $7 $8 $9 ${10} ${11} ${12} ${13} ${14} ${15} ${16} ${17} ${18} ${19} ${20} ${21}
   write_plugin_config
+  sleep 2
   write_minidlna_conf_file
 }
 
