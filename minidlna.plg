@@ -6,7 +6,7 @@
 <!ENTITY plgver "1.0">
 <!ENTITY pkg "/boot/packages">
 <!ENTITY plg "/boot/config/plugins/minidlna">
-<!ENTITY img "/boot/config/plugins/images">
+<!ENTITY img "/boot/config/plugins/minidlna/images">
 <!ENTITY gui "/usr/local/emhttp/plugins">
 <!ENTITY ram "/usr/local/minidlna">
 <!ENTITY url1 "https://raw.github.com/fatfurrycat/unRAID/master">
@@ -31,9 +31,9 @@ Plugin file locations:
  /boot/config/plugins/minidlna/minidlna_1.1.0_static.tar.gz             # minidlna binaries and configuration file
  
  /boot/config/plugins/minidlna/minidlna.png                             # icon file (copied to webgui plugin dir)
- /boot/config/plugins/images/device_status.png                          # icon file (copied to webgui plugin dir)
- /boot/config/plugins/images/new_config.png                             # icon file (copied to webgui plugin dir)
- /boot/config/plugins/images/information.png                            # icon file (copied to webgui plugin dir)
+ /boot/config/plugins/minidlna/images/device_status.png                 # icon file (copied to webgui plugin dir)
+ /boot/config/plugins/minidlna/images/new_config.png                    # icon file (copied to webgui plugin dir)
+ /boot/config/plugins/minidlna/images/information.png                   # icon file (copied to webgui plugin dir)
  /boot/config/plugins/minidlna/minidlna.cfg                             # non-volatile configuration for plugin
  /boot/config/plugins/minidlna/minidlna.conf                            # non-volatile configuration for minidlna
  /etc/rc.d/rc.minidlna                                                  # plugin control script
@@ -241,7 +241,7 @@ write_plugin_config()
 
 write_minidlna_conf_file()
 {
-  echo "# minidlna server daemon configuration file" >> /boot/config/plugins/minidlna/minidlna.conf
+  echo "# minidlna server daemon configuration file" > /boot/config/plugins/minidlna/minidlna.conf
   echo "# port for HTTP (descriptions, SOAP, media transfer) traffic" >> /boot/config/plugins/minidlna/minidlna.conf
   echo "port=$PORT" >> /boot/config/plugins/minidlna/minidlna.conf
   echo "# network interface to bind to (this is the only interface that will serve files)" >> /boot/config/plugins/minidlna/minidlna.conf
@@ -548,15 +548,15 @@ esac
 </FILE>
 
 <FILE Name="/usr/local/emhttp/plugins/minidlna/device_status.png">
-<LOCAL>/boot/config/plugins/images/device_status.png</LOCAL>
+<LOCAL>/boot/config/plugins/minidlna/images/device_status.png</LOCAL>
 </FILE>
 
 <FILE Name="/usr/local/emhttp/plugins/minidlna/new_config.png">
-<LOCAL>/boot/config/plugins/images/new_config.png</LOCAL>
+<LOCAL>/boot/config/plugins/minidlna/images/new_config.png</LOCAL>
 </FILE>
 
 <FILE Name="/usr/local/emhttp/plugins/minidlna/information.png">
-<LOCAL>/boot/config/plugins/images/information.png</LOCAL>
+<LOCAL>/boot/config/plugins/minidlna/images/information.png</LOCAL>
 </FILE>
 
 <FILE Name="/usr/local/emhttp/plugins/minidlna/minidlna.php">
