@@ -11,7 +11,7 @@
 <!ENTITY ram "/usr/local/minidlna">
 <!ENTITY url1 "https://raw.github.com/fatfurrycat/unRAID/master">
 <!ENTITY url2 "https://dl.dropbox.com/u/3094307/unRAID">
-<!ENTITY dev "true"><!-- set to "true" during plugin development -->
+<!ENTITY dev "false"><!-- set to "true" during plugin development -->
 ]>
 
 <PLUGIN>
@@ -206,7 +206,7 @@ minidlna_rescan()
   # This can be necessary if you've added files to the library directories when minidlna was not running.
   # Doing so prevents inotify from being used to recognise that new files are available.
   minidlna_stop
-  CMDLINE="/usr/local/minidlna/minidlnad -f /boot/config/plugins/minidlna/minidlna.conf -P /var/run/minidlna/minidlna.pid -R > /dev/null 2>&1"
+  CMDLINE="/usr/local/minidlna/minidlnad -f /boot/config/plugins/minidlna/minidlna.conf -P /var/run/minidlna/minidlna.pid -R"
   $CMDLINE 
 }
 
@@ -320,38 +320,6 @@ minidlna_change_settings()
   PORT=$1
   NETWORK_INTERFACE=$2
   USER=$3
-
-  # These tests should now be redundant, due to extra checking on form submission.
-
-  #if [ "$4" = "" ]; then
-  #  MEDIA_DIR1=nodir
-  #else
-  #  MEDIA_DIR1=$4
-  #fi
-
-  #if [ "$5" = "" ]; then
-  #  MEDIA_DIR2=nodir
-  #else
-  #  MEDIA_DIR2=$5
-  #fi
-
-  #if [ "$6" = "" ]; then
-  #  MEDIA_DIR3=nodir
-  #else
-  #  MEDIA_DIR3=$6
-  #fi
-
-  #if [ "$7" = "" ]; then
-  #  MEDIA_DIR4=nodir
-  #else
-  #  MEDIA_DIR4=$7
-  #fi
-
-  #if [ "$8" = "" ]; then
-  #  MEDIA_DIR5=nodir
-  #else
-  #  MEDIA_DIR5=$8
-  #fi
 
   MEDIA_DIR1=$4
   MEDIA_DIR2=$5
